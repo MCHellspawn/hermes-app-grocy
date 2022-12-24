@@ -11,6 +11,10 @@ Requires:
 ### In Docker:
 To install, clone the repository and execute docker build to build the image.
 
+```bash
+sudo docker build hermes-app-grocy -t <image_name>
+```
+
 ### In Rhasspy:
 Create a new sentence file and copy the sentences from the sentences.ini into the new file in Rhasspy and save. Retrain Rhasspy.
 
@@ -34,6 +38,17 @@ apikey = apikey
 
 Build a docker container using the image created above.
 Bind the config volume <path/on/host>:/app/config
+
+```bash
+sudo docker run -it -d \
+        --restart always \
+        --name <container_name> \
+        -v <path/on/host>:/app/config \
+        -e "MQTT_HOST=<MQTT Host/IP>" \
+        -e "MQTT_PORT=<MQTT Port (Typically:1883)" \
+        -e "MQTT_USER=<MQTT User>" \
+        -e "MQTT_PASSWORD=<MQTT Password>" \
+```
 
 The following intents are implemented on the hermes MQTT topic:
 
