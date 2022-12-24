@@ -2,7 +2,7 @@
 .vscode/launch.json
 hermes-app-test.py
 debug.py
-config/config-home.ini
-config/config.ini
+config
 rhasspy-app-grocy
 rhasspy-app-grocy/*
+config/config.ini

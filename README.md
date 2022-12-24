@@ -74,7 +74,7 @@ The following intents are implemented on the hermes MQTT topic:
       * By product
   * Shopping lists
     * Create
-    * Remove
+    * Remove?
     * Add items
       * By product
       * By "below min stock"
@@ -94,7 +94,7 @@ The following intents are implemented on the hermes MQTT topic:
   * Batteries
     * Change/Track
   * Locations
-    * List
+    * List - Complete
     * Create
 * Slot programs
   * people/users
