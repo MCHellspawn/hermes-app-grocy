@@ -1,0 +1,1 @@
+python hermes-app-time.py --host 192.168.1.26 --username rhasspy --password fKk#SLz^3^xp89 --port 1883

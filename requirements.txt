@@ -1,0 +1,2 @@
+rhasspy-hermes-app==1.1.2
+pygrocy==1.5.0
