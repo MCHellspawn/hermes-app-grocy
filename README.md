@@ -57,3 +57,49 @@ The following intents are implemented on the hermes MQTT topic:
 
 [GrocyPurchaseProduct]
 ```
+
+## To-Do
+
+* Clean up install process
+* More intents
+  * Products
+    * "Purchase" - Complete
+    * Transfer
+    * Inventory
+    * Consume
+    * Stock Listing
+      * All
+      * By location
+      * By product type
+      * By product
+  * Shopping lists
+    * Create
+    * Remove
+    * Add items
+      * By product
+      * By "below min stock"
+      * By "expired"
+      * By recipe
+    * Remove items
+      * By product
+      * Push items to stock
+  * Recipies
+    * Consume ingredients
+  * Chores
+    * Assign
+    * Complete/Skip
+    * List
+      * All
+      * Per person
+  * Batteries
+    * Change/Track
+  * Locations
+    * List
+    * Create
+* Slot programs
+  * people/users
+  * products
+  * locations
+  * chores
+  * batteries
+  * recipes
