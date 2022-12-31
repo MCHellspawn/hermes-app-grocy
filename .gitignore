@@ -4,5 +4,3 @@ hermes-app-test.py
 debug.py
 config
 rhasspy-app-grocy
-rhasspy-app-grocy/*
-config/config.ini

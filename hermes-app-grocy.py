@@ -7,6 +7,7 @@ from rhasspyhermes.nlu import NluIntent
 from rhasspyhermes_app import EndSession, HermesApp
 from pygrocy.data_models.generic import EntityType
 from pygrocy import Grocy
+from pygrocy.grocy_api_client import GrocyApiClient,TransactionType
 
 _LOGGER = logging.getLogger("GrocyApp")
 
@@ -22,9 +23,33 @@ def read_configuration_file():
                 for section in cp.sections()}
     except (IOError, configparser.Error):
         return dict()
-    
+
+def grocy_add_product(
+    grocyapiclient: GrocyApiClient,
+    product_id,
+    amount: float,
+    price: float,
+    best_before_date: None,
+    transaction_type: TransactionType = TransactionType.PURCHASE,
+    location: int = None,
+):
+    data = {
+        "amount": amount,
+        "transaction_type": transaction_type.value,
+        "price": price,
+        "location_id": location,
+    }
+
+    if location is not None:
+        data["location_id"] = location
+
+    if best_before_date is not None:
+        data["best_before_date"] = best_before_date.strftime("%Y-%m-%d")
+
+    return grocyapiclient._do_post_request(f"stock/products/{product_id}/add", data)
+   
 @app.on_intent("GrocyGetLocations")
-async def get_location(intent: NluIntent):
+async def get_locations(intent: NluIntent):
     """List the locations."""
     _LOGGER.info(f"Intent: {intent.id} | Started: GrocyGetLocations")
 
@@ -35,23 +60,23 @@ async def get_location(intent: NluIntent):
     isfreezers = 0
 
     #Check if the "freezer" slot was sent
-    isfreezers = any(slot for slot in intent.slots if slot.slot_name == 'freezer')
-    _LOGGER.info(f"Intent: {intent.id} | Is Freezer: {str(isfreezers)}")
-
-    #Get locations, filter based on the "freezer" slot
-    if isfreezers:
+    if any(slot for slot in intent.slots if slot.slot_name == 'freezer'):
+        _LOGGER.info(f"Intent: {intent.id} | Is Freezer: {str(isfreezers)}")
+        #Get locations, filter for freezers
         locations = grocy.get_generic_objects_for_type(EntityType.LOCATIONS, "is_freezer=1")
     else:
+        _LOGGER.info(f"Intent: {intent.id} | Is Freezer: <none>")
+        #Get locations, no filter
         locations = grocy.get_generic_objects_for_type(EntityType.LOCATIONS)
     _LOGGER.info(f"Intent: {intent.id} | Location count: {len(locations)}")
-
+        
     #Build response sentence
     sentence = "The available locations are "
     for location in locations[:len(locations)-1]:
         sentence = sentence + location["name"] + ", "
     sentence = sentence + "and " + locations[-1]["name"]
                 
-    _LOGGER.info(f"Intent: {intent.id} | Responded to GetLocations")
+    _LOGGER.info(f"Intent: {intent.id} | Responded to GrocyGetLocations")
     _LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
     _LOGGER.info(f"Intent: {intent.id} | Completed: GrocyGetLocations")
     return EndSession(sentence)
@@ -86,7 +111,9 @@ async def purchase_product(intent: NluIntent):
         _LOGGER.info(f"Intent: {intent.id} | Quantity: {str(quantity.value['value'])} ({str(quantity.raw_value)})")
     
     #"Purchase" the product into Grocy inventory
-    addedproduct = grocy.add_product(product_id=product.value['value'], amount=quantity.value['value'], price=0.0, best_before_date=None, location=location.value['value'])
+    #Temporarily commented out until the pygrocy library is updated to accept the location_id
+    #addedproduct = grocy.add_product(product_id=product.value['value'], amount=quantity.value['value'], price=0.0, best_before_date=None, location=location.value['value'])
+    addedproduct = grocy_add_product(grocy._api_client, product_id=product.value['value'], amount=quantity.value['value'], price=0.0, best_before_date=None, location=location.value['value'])
     _LOGGER.info(f"Intent: {intent.id} | Added Product: {str(addedproduct)}")
 
     #Build response sentence
@@ -96,6 +123,50 @@ async def purchase_product(intent: NluIntent):
     _LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
     _LOGGER.info(f"Intent: {intent.id} | Completed: GrocyPurchaseProduct")
     return EndSession(sentence)
+
+@app.on_intent("GrocyGetChores")
+async def get_chores(intent: NluIntent):
+    """List the chores."""
+    _LOGGER.info(f"Intent: {intent.id} | Started: GrocyGetChores")
+
+    global grocy
+    
+    sentence = None
+    chores = None
+
+    #Check if the "person" slot was sent
+    person_slot_active = any(slot for slot in intent.slots if slot.slot_name == 'person')
+    if person_slot_active:
+        person = next((slot for slot in intent.slots if slot.slot_name == 'person'), None)
+        _LOGGER.info(f"Intent: {intent.id} | Person: {str(person.value['value'])} ({str(person.raw_value)})")
+        chores = grocy.chores(get_details=True, query_filters=f"next_execution_assigned_to_user_id={str(person.value['value'])}")
+    else:
+        _LOGGER.info(f"Intent: {intent.id} | Person: <none>")
+        chores = grocy.chores(get_details=True)
+    _LOGGER.info(f"Intent: {intent.id} | Chore count: {len(chores)}")
+
+    #Build response sentence
+    if person_slot_active:
+        if len(chores) > 1:
+            sentence = f"{person.raw_value} active chores are "
+            for chore in chores[:len(chores)-1]:
+                sentence = sentence + chore.name + ", "
+            sentence = sentence + "and " + chores[-1].name
+        else:        
+            sentence = f"{person.raw_value} active chore is {chores[0].name}"
+    else:
+        if len(chores) > 1:
+            sentence = "The active chores are "
+            for chore in chores[:len(chores)-1]:
+                sentence = sentence + chore.name + ", "
+            sentence = sentence + "and " + chores[-1].name
+        else:        
+            sentence = f"The active chore is {chores[0].name}"
+                
+    _LOGGER.info(f"Intent: {intent.id} | Responded to GrocyGetChores")
+    _LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+    _LOGGER.info(f"Intent: {intent.id} | Completed: GrocyGetChores")
+    return EndSession(sentence)    
 
 if __name__ == "__main__":
     _LOGGER.info("Starting Hermes App: Grocy")

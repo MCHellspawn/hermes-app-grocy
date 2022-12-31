@@ -48,6 +48,7 @@ sudo docker run -it -d \
         -e "MQTT_PORT=<MQTT Port (Typically:1883)" \
         -e "MQTT_USER=<MQTT User>" \
         -e "MQTT_PASSWORD=<MQTT Password>" \
+        <image_name>
 ```
 
 The following intents are implemented on the hermes MQTT topic:
@@ -88,9 +89,9 @@ The following intents are implemented on the hermes MQTT topic:
   * Chores
     * Assign
     * Complete/Skip
-    * List
-      * All
-      * Per person
+    * List - Complete
+      * All - Complete
+      * Per person - Complete
   * Batteries
     * Change/Track
   * Locations
