@@ -168,6 +168,33 @@ async def get_chores(intent: NluIntent):
     _LOGGER.info(f"Intent: {intent.id} | Completed: GrocyGetChores")
     return EndSession(sentence)    
 
+@app.on_intent("GrocyTrackChore")
+async def track_chore(intent: NluIntent):
+    """Track a chore."""
+    _LOGGER.info(f"Intent: {intent.id} | Started: GrocyTrackChore")
+
+    global grocy
+    
+    sentence = None
+    chores = None
+    action = next((slot for slot in intent.slots if slot.slot_name == 'action'), None)
+
+    #Check if the "person" slot was sent
+    person_slot_active = any(slot for slot in intent.slots if slot.slot_name == 'person')
+    if person_slot_active:
+        person = next((slot for slot in intent.slots if slot.slot_name == 'person'), None)
+        _LOGGER.info(f"Intent: {intent.id} | Person: {str(person.value['value'])} ({str(person.raw_value)})")
+        chores = grocy.chores(get_details=True, query_filters=f"next_execution_assigned_to_user_id={str(person.value['value'])}")
+    else:
+        _LOGGER.info(f"Intent: {intent.id} | Person: <none>")
+        chores = grocy.chores(get_details=True)
+    _LOGGER.info(f"Intent: {intent.id} | Chore count: {len(chores)}")
+    
+    if action == "Complete":
+        _LOGGER.info(f"Intent: {intent.id} | Action: {action}")    
+    elif action == "Skip":
+        _LOGGER.info(f"Intent: {intent.id} | Action: {action}")
+
 if __name__ == "__main__":
     _LOGGER.info("Starting Hermes App: Grocy")
     config = read_configuration_file()

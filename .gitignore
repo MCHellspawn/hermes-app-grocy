@@ -1,6 +1,5 @@
 .gitignore
 .vscode/launch.json
-hermes-app-test.py
 debug.py
 config
 rhasspy-app-grocy
