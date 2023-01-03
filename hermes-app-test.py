@@ -30,13 +30,13 @@ async def handle_non_recognized(intent: NluIntentNotRecognized):
 async def test_response(intent: NluIntent):
     """Respond to the user"""
     _LOGGER.info("TestResponse intent: Fired")  
-    start_session = DialogueStartSession(init=DialogueNotification(text="Say something back?"), site_id=intent.site_id, lang=intent.lang, custom_data="TestResponse") 
+    #start_session = DialogueStartSession(init=DialogueNotification(text="Say something back?"), site_id=intent.site_id, lang=intent.lang, custom_data="TestResponse") 
 
-    return EndSession()
+    #return EndSession()
     
-    #return ContinueSession(
-    #    text="Say something back?", custom_data="TestResponse"
-    #)
+    return ContinueSession(
+        text="Say something back?", custom_data="TestResponse", send_intent_not_recognized=True
+    )
 
 # @app.on_topic("hermes/nlu/query")
 # async def test_topic4(data: TopicData, payload: bytes):
