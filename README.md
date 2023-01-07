@@ -149,8 +149,9 @@ The following intents are implemented on the hermes MQTT topic:
     * Create
 * Slot programs
   * people/users
-  * products
-  * locations
-  * chores
+  * products - Complete
+  * locations - Complete
+  * chores - Complete
+  * quantity_units - Complete
   * batteries
   * recipes
