@@ -84,9 +84,9 @@ The following intents are implemented on the hermes MQTT topic:
 
 [GrocyPurchaseProduct]
 
+[GrocyGetChores]
+
 [GrocyTrackChore]
-chores = $grocy/chores
-(Complete | Skip){action} [the] (<chores>){chore} chore
 ```
 
 ## To-Do
@@ -118,7 +118,8 @@ chores = $grocy/chores
     * Consume ingredients
   * Chores
     * Assign
-    * Complete/Skip
+    * Complete/Skip - Complete - basic only
+      * Complete/skip by person
     * List - Complete
       * All - Complete
       * Per person - Complete
