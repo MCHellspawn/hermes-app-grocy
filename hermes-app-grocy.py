@@ -3,6 +3,7 @@ import os
 import io
 import logging
 import configparser
+from datetime import datetime
 from rhasspyhermes.nlu import NluIntent
 from rhasspyhermes_app import EndSession, HermesApp
 from pygrocy.data_models.generic import EntityType
@@ -176,24 +177,28 @@ async def track_chore(intent: NluIntent):
     global grocy
     
     sentence = None
-    chores = None
-    action = next((slot for slot in intent.slots if slot.slot_name == 'action'), None)
 
-    #Check if the "person" slot was sent
-    person_slot_active = any(slot for slot in intent.slots if slot.slot_name == 'person')
-    if person_slot_active:
-        person = next((slot for slot in intent.slots if slot.slot_name == 'person'), None)
-        _LOGGER.info(f"Intent: {intent.id} | Person: {str(person.value['value'])} ({str(person.raw_value)})")
-        chores = grocy.chores(get_details=True, query_filters=f"next_execution_assigned_to_user_id={str(person.value['value'])}")
-    else:
-        _LOGGER.info(f"Intent: {intent.id} | Person: <none>")
-        chores = grocy.chores(get_details=True)
-    _LOGGER.info(f"Intent: {intent.id} | Chore count: {len(chores)}")
+    #Get the "action" slot
+    action = next((slot for slot in intent.slots if slot.slot_name == 'action'), None)
+    if action == None:
+        return EndSession("I need to know what action to do")    
+    _LOGGER.info(f"Intent: {intent.id} | Action: {str(action.value['value'])} ({str(action.raw_value)})")
+
+    #Get the "chore" slot
+    chore = next((slot for slot in intent.slots if slot.slot_name == 'chore'), None)
+    if chore == None:
+        return EndSession("I need to know what chore to complete")    
+    _LOGGER.info(f"Intent: {intent.id} | Chore: {str(chore.value['value'])} ({str(chore.raw_value)})")
     
-    if action == "Complete":
-        _LOGGER.info(f"Intent: {intent.id} | Action: {action}")    
-    elif action == "Skip":
-        _LOGGER.info(f"Intent: {intent.id} | Action: {action}")
+    if action.value['value'] == "Complete":
+        execute_chore = grocy.execute_chore(chore_id=chore.value['value'], tracked_time=datetime.now())
+        _LOGGER.info(f"Intent: {intent.id} | Execute chore response: {execute_chore}")    
+        _LOGGER.info(f"Intent: {intent.id} | Completed chore: {chore.value['value']}")    
+    elif action.value['value'] == "Skip":
+        execute_chore = grocy.execute_chore(chore_id=chore.value['value'], tracked_time=datetime.now(), skipped=True)
+        _LOGGER.info(f"Intent: {intent.id} | Execute chore response: {execute_chore}")
+        _LOGGER.info(f"Intent: {intent.id} | Skipped chore: {chore.value['value']}")    
+    return EndSession("I've marked the chore complete")    
 
 if __name__ == "__main__":
     _LOGGER.info("Starting Hermes App: Grocy")

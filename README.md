@@ -18,6 +18,32 @@ sudo docker build hermes-app-grocy -t <image_name>
 ### In Rhasspy:
 Create a new sentence file and copy the sentences from the sentences.ini into the new file in Rhasspy and save. Retrain Rhasspy.
 
+Setup the slot program:
+1. SSH into the Rhasspy device 
+   * If using a base/satellite setup this is typically done on the base
+2. Navigate to your slot programs folder
+   * for example "/profiles/en/slot_programs"
+```bash
+cd /profiles/en/slot_programs
+```
+3. Create a folder name "grocy" and navigate to it
+```bash
+mkdir grocy
+cd grocy
+```
+4. Download the slot program from the github repo
+```bash
+wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/chores
+```
+5. Setup the slot variables
+```ini
+chores = $grocy/chores
+```
+6. Use the slot variable in a sentence
+```ini
+Complete [the] (<chores>){chore} chore
+```
+
 ## Configuration
 
 Edit the setup section with the connection settings for Grocy:
@@ -57,6 +83,10 @@ The following intents are implemented on the hermes MQTT topic:
 [GrocyGetLocations]
 
 [GrocyPurchaseProduct]
+
+[GrocyTrackChore]
+chores = $grocy/chores
+(Complete | Skip){action} [the] (<chores>){chore} chore
 ```
 
 ## To-Do
