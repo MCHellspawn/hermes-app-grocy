@@ -34,6 +34,9 @@ cd grocy
 4. Download the slot program from the github repo
 ```bash
 wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/chores
+wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/locations
+wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/products
+wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/quantity_units
 ```
 5. Edit the Rhasspy config file
 ```bash
@@ -50,9 +53,13 @@ nano profile.json
 7. Setup the slot variables
 ```ini
 chores = $grocy/chores
+products = $grocy/products
+locations = $grocy/locations
+quantity_units = $grocy/quantity_units
 ```
-8. Use the slot variable in a sentence
+8. Use the slot variables in a sentence
 ```ini
+Purchase (1..1000){quantity} (<quantity_units>){measure} [of] (<products>){product} into [the] (<locations>){location}
 Complete [the] (<chores>){chore} chore
 ```
 
