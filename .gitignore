@@ -4,3 +4,4 @@ debug.py
 config
 rhasspy-app-grocy
 hermes-app-debug.py
+slot_programs/chores-get
