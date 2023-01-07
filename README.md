@@ -35,11 +35,23 @@ cd grocy
 ```bash
 wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/chores
 ```
-5. Setup the slot variables
+5. Edit the Rhasspy config file
+```bash
+cd ..
+nano profile.json
+```
+6. Add the Grocy connection settings at the end, be sure to add a comma (,) after the last entry
+```json
+    "grocy": {
+        "url": "<url to grocy server>",
+        "api_key": "<api key from grocy>"
+    }
+```
+7. Setup the slot variables
 ```ini
 chores = $grocy/chores
 ```
-6. Use the slot variable in a sentence
+8. Use the slot variable in a sentence
 ```ini
 Complete [the] (<chores>){chore} chore
 ```
