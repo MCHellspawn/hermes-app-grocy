@@ -48,7 +48,8 @@ def grocy_add_product(
         data["best_before_date"] = best_before_date.strftime("%Y-%m-%d")
 
     return grocyapiclient._do_post_request(f"stock/products/{product_id}/add", data)
-   
+
+#Utility Intents   
 @app.on_intent("GrocyGetLocations")
 async def get_locations(intent: NluIntent):
     """List the locations."""
@@ -82,6 +83,7 @@ async def get_locations(intent: NluIntent):
     _LOGGER.info(f"Intent: {intent.id} | Completed: GrocyGetLocations")
     return EndSession(sentence)
 
+#Product Intents
 @app.on_intent("GrocyPurchaseProduct")
 async def purchase_product(intent: NluIntent):
     """Purchase a product."""
@@ -125,6 +127,7 @@ async def purchase_product(intent: NluIntent):
     _LOGGER.info(f"Intent: {intent.id} | Completed: GrocyPurchaseProduct")
     return EndSession(sentence)
 
+#Chore Intents
 @app.on_intent("GrocyGetChores")
 async def get_chores(intent: NluIntent):
     """List the chores."""
@@ -199,6 +202,100 @@ async def track_chore(intent: NluIntent):
         _LOGGER.info(f"Intent: {intent.id} | Execute chore response: {execute_chore}")
         _LOGGER.info(f"Intent: {intent.id} | Skipped chore: {chore.value['value']}")    
     return EndSession("I've marked the chore complete")    
+
+#Shopping List Intents
+@app.on_intent("GrocyGetShoppingLists")
+async def get_shoppinglist(intent: NluIntent):
+    """List the shopping lists."""
+    _LOGGER.info(f"Intent: {intent.id} | Started: GrocyGetShoppingLists")
+
+    global grocy
+    
+    sentence = None
+
+    shoppingLists = grocy.get_generic_objects_for_type(EntityType.SHOPPING_LISTS)    
+    _LOGGER.debug(f"Intent: {intent.id} | Shopping Lists: {shoppingLists}")
+    _LOGGER.info(f"Intent: {intent.id} | Shopping List count: {len(shoppingLists)}")
+
+    if len(shoppingLists) > 1:
+        sentence = "There is the "
+        for shoppingList in shoppingLists[:len(shoppingLists)-1]:
+            sentence = sentence + shoppingList['name'] + ", "
+        sentence = sentence + "and " + shoppingLists[-1]['name']
+    else:        
+        sentence = f"There is only the {shoppingLists[0]['name']}"    
+
+    _LOGGER.info(f"Intent: {intent.id} | Responded to GrocyGetShoppingLists")
+    _LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+    _LOGGER.info(f"Intent: {intent.id} | Completed: GrocyGetShoppingLists")
+    return EndSession(sentence)    
+
+@app.on_intent("GrocyCreateShoppingList")
+async def create_shopping_list(intent: NluIntent):
+    """Create a shopping list."""
+    _LOGGER.info(f"Intent: {intent.id} | Started: GrocyCreateShoppingList")
+
+    global grocy
+    
+    sentence = None
+    shoppingListCheck = None
+    shoppingList = None
+
+    nameslot = next((slot for slot in intent.slots if slot.slot_name == 'name'), None)
+    if nameslot == None:
+        _LOGGER.info(f"Intent: {intent.id} | Name slot equals none")
+        sentence = "I need to know the name of the shopping list"
+    elif len(nameslot.value['value']) == 0:
+        _LOGGER.info(f"Intent: {intent.id} | Name slot exists but name is blank")
+        extractedListName = intent.raw_input.replace("create a new shopping list called ", "")
+        _LOGGER.info(f"Intent: {intent.id} | Name extracted: {extractedListName}")
+        if len(extractedListName) > 0:
+            shoppingListCheck = grocy.get_generic_objects_for_type(EntityType.SHOPPING_LISTS, f"name={extractedListName}")    
+            if len(shoppingListCheck) == 0:
+                data = {
+                    "name": extractedListName,
+                }
+                shoppingListResponse = grocy.add_generic(EntityType.SHOPPING_LISTS, data)
+                _LOGGER.debug(f"Intent: {intent.id} | Shopping List response: {shoppingListResponse}")
+                _LOGGER.info(f"Intent: {intent.id} | Shopping List created: {shoppingListResponse['created_object_id']}")
+                shoppingList = grocy.get_generic_objects_for_type(EntityType.SHOPPING_LISTS, f"id={shoppingListResponse['created_object_id']}")    
+                _LOGGER.debug(f"Intent: {intent.id} | Shopping List: {shoppingList}")
+                _LOGGER.info(f"Intent: {intent.id} | Shopping List retrieved from Grocy: {shoppingList[0]['name']}")
+                sentence = f"I created a new list called {shoppingList[0]['name']}"
+            else:
+                _LOGGER.info(f"Intent: {intent.id} | Shopping List creation failed: List exists")
+                sentence = f"A list called {extractedListName} already exists"
+        else:
+            _LOGGER.info(f"Intent: {intent.id} | Unable to extract name from name slot")
+            sentence = "I need to know the name of the shopping list"
+    else:
+        _LOGGER.info(f"Intent: {intent.id} | Name: {str(nameslot.value['value'])} ({str(nameslot.raw_value)})")
+        shoppingListCheck = grocy.get_generic_objects_for_type(EntityType.SHOPPING_LISTS, f"name={nameslot.value['value']}")    
+        if len(shoppingListCheck) == 0:
+            data = {
+                "name": nameslot.value['value'],
+            }
+            shoppingList = grocy.add_generic(EntityType.SHOPPING_LISTS, data)
+            sentence = f"I created a new list called {shoppingList['name']}"
+
+    _LOGGER.info(f"Intent: {intent.id} | Responded to GrocyCreateShoppingList")
+    _LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+    _LOGGER.info(f"Intent: {intent.id} | Completed: GrocyCreateShoppingList")
+    return EndSession(sentence)    
+
+@app.on_intent("GrocyAddProductToShoppingList")
+async def add_product_to_shopping_list(intent: NluIntent):
+    """Add product to a the shopping list."""
+    _LOGGER.info(f"Intent: {intent.id} | Started: GrocyAddProductToShoppingList")
+
+    global grocy
+    
+    sentence = None
+    
+    _LOGGER.info(f"Intent: {intent.id} | Responded to GrocyAddProductToShoppingList")
+    _LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+    _LOGGER.info(f"Intent: {intent.id} | Completed: GrocyAddProductToShoppingList")
+    return EndSession(sentence)    
 
 if __name__ == "__main__":
     _LOGGER.info("Starting Hermes App: Grocy")

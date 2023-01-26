@@ -123,10 +123,11 @@ The following intents are implemented on the hermes MQTT topic:
       * By product type
       * By product
   * Shopping lists
-    * Create
+    * List - Complete
+    * Create - Complete - basic only
     * Remove?
     * Add items
-      * By product
+      * By product - In progress
       * By "below min stock"
       * By "expired"
       * By recipe

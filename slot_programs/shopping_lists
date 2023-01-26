@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+# Downloads available shopping lists from Grocy
+#
+# Requires: curl, jq, bash to be installed
+#
+# Assumes that you have add the neccessary configuration entries to your Rhasspy profile
+#    "grocy": {
+#        "url": "<url to grocy server>",
+#        "api_key": "<api key from grocy>"
+#    }
+
+set -e
+
+# Read Rhasspy profile JSON
+if [[ -z "${RHASSPY_PROFILE_DIR}" ]]; then
+    SCRIPT=$(readlink -f "$0")
+    SCRIPTPATH=$(dirname "$SCRIPT")
+    echo $SCRIPTPATH >&2
+fi
+
+profile="${RHASSPY_PROFILE_DIR}/profile.json"
+url="$(jq --raw-output .grocy.url < "${profile}")"
+url="${url%/}"
+token="$(jq --raw-output .grocy.api_key < "${profile}")"
+
+#Get chores
+echo "GET ${url}/api/objects/shopping_lists?order=name%3Aasc" >&2
+curl -X GET "${url}/api/objects/shopping_lists?order=name%3Aasc" -H "GROCY-API-KEY:${token}" | \
+    jq --raw-output '.[] as $e | "(\($e.name)):\($e.id)"'
