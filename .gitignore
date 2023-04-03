@@ -5,3 +5,4 @@ config
 rhasspy-app-grocy
 hermes-app-debug.py
 slot_programs/chores-get
+__pycache__/skill.cpython-38.pyc
