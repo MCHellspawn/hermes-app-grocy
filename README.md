@@ -33,31 +33,26 @@ cd grocy
 ```
 4. Download the slot program from the github repo
 ```bash
+wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/batteries
 wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/chores
 wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/locations
 wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/products
 wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/quantity_units
+wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/shopping_lists
+wget https://raw.githubusercontent.com/MCHellspawn/hermes-app-grocy/master/slot_programs/users
+
 ```
-5. Edit the Rhasspy config file
-```bash
-cd ..
-nano profile.json
-```
-6. Add the Grocy connection settings at the end, be sure to add a comma (,) after the last entry
-```json
-    "grocy": {
-        "url": "<url to grocy server>",
-        "api_key": "<api key from grocy>"
-    }
-```
-7. Setup the slot variables
+5. Setup the slot variables
 ```ini
+batteries = $grocy/batteries
 chores = $grocy/chores
 products = $grocy/products
 locations = $grocy/locations
 quantity_units = $grocy/quantity_units
+shoppinglists = $grocy/shopping_lists
+users = $grocy/users
 ```
-8. Use the slot variables in a sentence
+6. Use the slot variables in a sentence
 ```ini
 Purchase (1..1000){quantity} (<quantity_units>){measure} [of] (<products>){product} into [the] (<locations>){location}
 Complete [the] (<chores>){chore} chore
@@ -65,19 +60,33 @@ Complete [the] (<chores>){chore} chore
 
 ## Configuration
 
-Edit the setup section with the connection settings for Grocy:
+Edit the setup section with the connection settings for Grocy and Rhasspy:
 ```ini
 [setup]
-host = http://localhost
+host = http://grocy.local
 port = 80
 verifyssl = False
 apikey = apikey
+
+[Rhasspy]
+# May be http or https
+protocol = http
+# Hostname or IP for Rhasspy intent recognition device
+host = rhasspybase.local
+# Port for Rhasspy device used above
+port = 12101
 ```
 
-* `host: string` - URL of the Grocy Hostname/IP
-* `port: integer` - IP Port of the Grocy web API
-* `verifyssl: boolean` - Verify SSL certificate
-* `apikey: string` - API Key from Grocy
+* Grocy
+  * `host: string` - URL of the Grocy Hostname/IP
+  * `port: integer` - IP Port of the Grocy web API
+  * `verifyssl: boolean` - Verify SSL certificate
+  * `apikey: string` - API Key from Grocy
+
+* Rhasspy
+  * `protocol: string` - http or https
+  * `host: string` - URL of the Rhasspy device handling intent recognition
+  * `port: integer` - IP Port of the Rhasspy device handling intent recognition
 
 ## Using
 
@@ -106,6 +115,18 @@ The following intents are implemented on the hermes MQTT topic:
 [GrocyGetChores]
 
 [GrocyTrackChore]
+
+[GrocyGetShoppingLists]
+
+[GrocyCreateShoppingList]
+
+[GrocyAddProductToShoppingList]
+
+[GrocyRemoveProductFromShoppingList]
+
+[GrocyGetBatteries]
+
+[GrocyGetBatteryNextCharge]
 ```
 
 ## To-Do
