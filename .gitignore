@@ -1,8 +1,9 @@
 .gitignore
-.vscode/launch.json
-debug.py
-config
+.vscode
+__pycache__
 rhasspy-app-grocy
-hermes-app-debug.py
+config/config.ini
+config/config-home.ini
 slot_programs/chores-get
-__pycache__/skill.cpython-38.pyc
+hermes-app-debug.py
+debug.py
