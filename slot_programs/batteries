@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-# Downloads available chores from Grocy
+# Downloads available batteries from Grocy
 #
 # Requires: curl, jq, bash to be installed
 #
 # Assumes that you have add the neccessary configuration entries to your Rhasspy profile
 #    "grocy": {
-#        "url": "<url to grocy server>"
+#        "url": "<url to grocy server>",
 #        "api_key": "<api key from grocy>"
 #    }
 
@@ -24,13 +24,7 @@ url="$(jq --raw-output .grocy.url < "${profile}")"
 url="${url%/}"
 token="$(jq --raw-output .grocy.api_key < "${profile}")"
 
-#Get users
-echo "GET ${url}/api/users" >&2
-curl -s X GET "${url}/api/users" -H "GROCY-API-KEY:${token}" | \
-    jq --raw-output '.[] as $e | "(\($e.first_name)):\($e.id)"'
-
-curl -s -X GET "${url}/api/users" -H "GROCY-API-KEY:${token}" | \
-    jq --raw-output '.[] as $e | "(\($e.first_name)'\''s):\($e.id)"'
-
-curl -s -X GET "${url}/api/users" -H "GROCY-API-KEY:${token}" | \
-    jq --raw-output '.[] as $e | "(\($e.display_name)):\($e.id)"'
+#Get chores
+echo "GET ${url}/api/objects/batteries?order=name%3Aasc&query%5B%5D=active%3D1" >&2
+curl -s -X GET "${url}/api/objects/batteries?order=name%3Aasc&query%5B%5D=active%3D1" -H "GROCY-API-KEY:${token}" | \
+    jq --raw-output '.[] as $e | "(\($e.name)):\($e.id)"'

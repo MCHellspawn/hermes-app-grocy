@@ -34,6 +34,9 @@ class IntentNames(str, Enum):
     GROCYGETSHOPPINGLISTS = "GrocyGetShoppingLists"
     GROCYCREATESHOPPINGLIST = "GrocyCreateShoppingList"
     GROCYADDPRODUCTTOSHOPPINGLIST = "GrocyAddProductToShoppingList"
+    GROCYREMOVEPRODUCTFROMSHOPPINGLIST = "GrocyRemoveProductFromShoppingList"
+    
+    GROCYGETBATTERIES = "GrocyGetBatteries"
 
 class RhasspySkill:
     name:str = None
@@ -128,6 +131,9 @@ class RhasspySkill:
         self.app.on_intent(IntentNames.GROCYGETSHOPPINGLISTS)(self.get_shoppinglist)
         self.app.on_intent(IntentNames.GROCYCREATESHOPPINGLIST)(self.create_shopping_list)
         self.app.on_intent(IntentNames.GROCYADDPRODUCTTOSHOPPINGLIST)(self.add_product_to_shopping_list)
+        self.app.on_intent(IntentNames.GROCYREMOVEPRODUCTFROMSHOPPINGLIST)(self.remove_product_from_shopping_list)
+        self.app.on_intent(IntentNames.GROCYGETBATTERIES)(self.get_batteries)
+
 
     def read_configuration_file(self):
         try:
@@ -139,18 +145,21 @@ class RhasspySkill:
         except (IOError, configparser.Error):
             return dict()
 
-    def response_sentence(self, intent: NluIntent, data_string: str):
+    def response_sentence(self, intent: NluIntent, data_string: str = None) -> str:
         self._LOGGER.debug(f"Intent: {intent.id} | Started response_sentence")
 
         # open the responses file in read mode
         responses = configparser.ConfigParser(allow_no_value=True)
         responses.read("config/responses.ini")
         
-        baseIntentName = intent.intent.intent_name.replace(f"-{intent.site_id}", '')
+        baseIntentName = intent.intent.intent_name
         
         intentResponses = responses.items(baseIntentName)[0]
         
-        sentence = random.choice(intentResponses[0:-1]).format(data_string)
+        if data_string == None:
+            sentence = random.choice(intentResponses[0:-1])
+        else:            
+            sentence = random.choice(intentResponses[0:-1]).format(data_string)
 
         self._LOGGER.debug(f"Intent: {intent.id} | response_sentence sentence: {sentence}")
         self._LOGGER.debug(f"Intent: {intent.id} | Completed response_sentence")
@@ -203,8 +212,6 @@ class RhasspySkill:
         """List the locations."""
         self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYGETLOCATIONS}")
 
-        global grocy
-        
         sentence = None
         locations = None
         isfreezers = 0
@@ -213,31 +220,30 @@ class RhasspySkill:
         if any(slot for slot in intent.slots if slot.slot_name == 'freezer'):
             self._LOGGER.info(f"Intent: {intent.id} | Is Freezer: {str(isfreezers)}")
             #Get locations, filter for freezers
-            locations = grocy.get_generic_objects_for_type(EntityType.LOCATIONS, "is_freezer=1")
+            locations = self.grocy.get_generic_objects_for_type(EntityType.LOCATIONS, "is_freezer=1")
         else:
             self._LOGGER.info(f"Intent: {intent.id} | Is Freezer: <none>")
             #Get locations, no filter
-            locations = grocy.get_generic_objects_for_type(EntityType.LOCATIONS)
+            locations = self.grocy.get_generic_objects_for_type(EntityType.LOCATIONS)
         self._LOGGER.info(f"Intent: {intent.id} | Location count: {len(locations)}")
             
         #Build response sentence
-        sentence = "The available locations are "
+        sentence = self.response_sentence(intent) + " "
         for location in locations[:len(locations)-1]:
             sentence = sentence + location["name"] + ", "
         sentence = sentence + "and " + locations[-1]["name"]
-                    
-        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYGETLOCATIONS}")
         self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+
+        self.app.notify(sentence, intent.site_id)
+        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYGETLOCATIONS}")
         self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYGETLOCATIONS}")
-        return EndSession(sentence)
+        return EndSession()
 
     #Product Intents
     async def purchase_product(self, intent: NluIntent):
         """Purchase a product."""
         self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYPURCHASEPRODUCT}")
 
-        global grocy
-        
         sentence = None
 
         #Check if the "product" slot was sent
@@ -263,23 +269,22 @@ class RhasspySkill:
         #"Purchase" the product into Grocy inventory
         #Temporarily commented out until the pygrocy library is updated to accept the location_id
         #addedproduct = grocy.add_product(product_id=product.value['value'], amount=quantity.value['value'], price=0.0, best_before_date=None, location=location.value['value'])
-        addedproduct = self.grocy_add_product(grocy._api_client, product_id=product.value['value'], amount=quantity.value['value'], price=0.0, best_before_date=None, location=location.value['value'])
+        addedproduct = self.grocy_add_product(self.grocy._api_client, product_id=product.value['value'], amount=quantity.value['value'], price=0.0, best_before_date=None, location=location.value['value'])
         self._LOGGER.info(f"Intent: {intent.id} | Added Product: {str(addedproduct)}")
 
         #Build response sentence
-        sentence = f"Added {str(quantity.value['value'])} {str(product.raw_value)}s to {str(location.raw_value)}"
-                    
-        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYPURCHASEPRODUCT}")
+        sentence = self.response_sentence(intent).format(str(quantity.value['value']), str(product.raw_value), str(location.raw_value))
         self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+
+        self.app.notify(sentence, intent.site_id)
+        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYPURCHASEPRODUCT}")
         self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYPURCHASEPRODUCT}")
-        return EndSession(sentence)
+        return EndSession()
 
     async def create_product(self, intent: NluIntent):
         """Create a product."""
         self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYCREATEPRODUCT}")
 
-        global grocy
-        
         sentence = None
 
         #Check if the "product" slot was sent
@@ -319,7 +324,7 @@ class RhasspySkill:
             "qu_factor_purchase_to_stock": 8
         }
         
-        newproduct = grocy.add_generic(EntityType.PRODUCTS, productdata)
+        newproduct = self.grocy.add_generic(EntityType.PRODUCTS, productdata)
         self._LOGGER.info(f"Intent: {intent.id} | Added Product: {str(newproduct)}")
 
         #Build response sentence
@@ -334,8 +339,6 @@ class RhasspySkill:
     async def get_chores(self, intent: NluIntent):
         """List the chores."""
         self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYGETCHORES}")
-
-        global grocy
         
         sentence = None
         chores = None
@@ -345,10 +348,10 @@ class RhasspySkill:
         if person_slot_active:
             person = next((slot for slot in intent.slots if slot.slot_name == 'person'), None)
             self._LOGGER.info(f"Intent: {intent.id} | Person: {str(person.value['value'])} ({str(person.raw_value)})")
-            chores = grocy.chores(get_details=True, query_filters=f"next_execution_assigned_to_user_id={str(person.value['value'])}")
+            chores = self.grocy.chores(get_details=True, query_filters=f"next_execution_assigned_to_user_id={str(person.value['value'])}")
         else:
             self._LOGGER.info(f"Intent: {intent.id} | Person: <none>")
-            chores = grocy.chores(get_details=True)
+            chores = self.grocy.chores(get_details=True)
         self._LOGGER.info(f"Intent: {intent.id} | Chore count: {len(chores)}")
 
         #Build response sentence
@@ -378,8 +381,6 @@ class RhasspySkill:
         """Track a chore."""
         self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYTRACKCHORE}")
 
-        global grocy
-        
         sentence = None
 
         #Get the "action" slot
@@ -395,12 +396,12 @@ class RhasspySkill:
         self._LOGGER.info(f"Intent: {intent.id} | Chore: {str(chore.value['value'])} ({str(chore.raw_value)})")
         
         if action.value['value'] == "Complete":
-            execute_chore = grocy.execute_chore(chore_id=chore.value['value'], tracked_time=datetime.now())
+            execute_chore = self.grocy.execute_chore(chore_id=chore.value['value'], tracked_time=datetime.now())
             sentence = "The chore has been marked complete"
             self._LOGGER.info(f"Intent: {intent.id} | Execute chore response: {execute_chore}")    
             self._LOGGER.info(f"Intent: {intent.id} | Completed chore: {chore.value['value']}")    
         elif action.value['value'] == "Skip":
-            execute_chore = grocy.execute_chore(chore_id=chore.value['value'], tracked_time=datetime.now(), skipped=True)
+            execute_chore = self.grocy.execute_chore(chore_id=chore.value['value'], tracked_time=datetime.now(), skipped=True)
             sentence = "The chore has been skipped"
             self._LOGGER.info(f"Intent: {intent.id} | Execute chore response: {execute_chore}")
             self._LOGGER.info(f"Intent: {intent.id} | Skipped chore: {chore.value['value']}")
@@ -413,13 +414,11 @@ class RhasspySkill:
     #Shopping List Intents
     async def get_shoppinglist(self, intent: NluIntent):
         """List the shopping lists."""
-        self._LOGGER.info(f"Intent: {intent.id} | Started: GrocyGetShoppingLists")
+        self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYGETSHOPPINGLISTS}")
 
-        global grocy
-        
         sentence = None
 
-        shoppingLists = grocy.get_generic_objects_for_type(EntityType.SHOPPING_LISTS)    
+        shoppingLists = self.grocy.get_generic_objects_for_type(EntityType.SHOPPING_LISTS)    
         self._LOGGER.debug(f"Intent: {intent.id} | Shopping Lists: {shoppingLists}")
         self._LOGGER.info(f"Intent: {intent.id} | Shopping List count: {len(shoppingLists)}")
 
@@ -431,14 +430,16 @@ class RhasspySkill:
         else:        
             sentence = f"There is only the {shoppingLists[0]['name']}"    
 
-        self._LOGGER.info(f"Intent: {intent.id} | Responded to GrocyGetShoppingLists")
         self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
-        self._LOGGER.info(f"Intent: {intent.id} | Completed: GrocyGetShoppingLists")
+        self.app.notify(sentence, intent.site_id)
+
+        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYGETSHOPPINGLISTS}")
+        self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYGETSHOPPINGLISTS}")
         return EndSession(sentence)    
 
     async def create_shopping_list(self, intent: NluIntent):
         """Create a shopping list."""
-        self._LOGGER.info(f"Intent: {intent.id} | Started: GrocyCreateShoppingList")
+        self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYCREATESHOPPINGLIST}")
 
         sentence = None
         shoppingListCheck = None
@@ -473,22 +474,22 @@ class RhasspySkill:
                 sentence = "I need to know the name of the shopping list"
         else:
             self._LOGGER.info(f"Intent: {intent.id} | Name: {str(nameslot.value['value'])} ({str(nameslot.raw_value)})")
-            shoppingListCheck = grocy.get_generic_objects_for_type(EntityType.SHOPPING_LISTS, f"name={nameslot.value['value']}")    
+            shoppingListCheck = self.grocy.get_generic_objects_for_type(EntityType.SHOPPING_LISTS, f"name={nameslot.value['value']}")    
             if len(shoppingListCheck) == 0:
                 data = {
                     "name": nameslot.value['value'],
                 }
-                shoppingList = grocy.add_generic(EntityType.SHOPPING_LISTS, data)
+                shoppingList = self.grocy.add_generic(EntityType.SHOPPING_LISTS, data)
                 sentence = f"I created a new list called {shoppingList['name']}"
 
-        self._LOGGER.info(f"Intent: {intent.id} | Responded to GrocyCreateShoppingList")
+        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYCREATESHOPPINGLIST}")
         self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
-        self._LOGGER.info(f"Intent: {intent.id} | Completed: GrocyCreateShoppingList")
+        self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYCREATESHOPPINGLIST}")
         return EndSession(sentence)    
 
     async def add_product_to_shopping_list(self, intent: NluIntent):
         """Add product to a the shopping list."""
-        self._LOGGER.info(f"Intent: {intent.id} | Started: GrocyAddProductToShoppingList")
+        self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYADDPRODUCTTOSHOPPINGLIST}")
         
         sentence = None
 
@@ -507,7 +508,65 @@ class RhasspySkill:
             self._LOGGER.info(f"Intent: {intent.id} | Product added to Shopping List")                
             sentence = "I added the product to the list"
         
-        self._LOGGER.info(f"Intent: {intent.id} | Responded to GrocyAddProductToShoppingList")
+        self.app.notify(sentence, intent.site_id)
+        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYADDPRODUCTTOSHOPPINGLIST}")
         self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
-        self._LOGGER.info(f"Intent: {intent.id} | Completed: GrocyAddProductToShoppingList")
+        self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYADDPRODUCTTOSHOPPINGLIST}")
+        return EndSession()    
+
+    async def remove_product_from_shopping_list(self, intent: NluIntent):
+        """Remove product from a the shopping list."""
+        self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYREMOVEPRODUCTFROMSHOPPINGLIST}")
+        
+        sentence = None
+
+        listslot = next((slot for slot in intent.slots if slot.slot_name == 'list'), None)
+        if listslot == None:
+            self._LOGGER.info(f"Intent: {intent.id} | List slot equals none")
+            sentence = "I need to know the name of the shopping list"
+
+        productslot = next((slot for slot in intent.slots if slot.slot_name == 'product'), None)
+        if productslot == None:
+            self._LOGGER.info(f"Intent: {intent.id} | Product slot equals none")
+            sentence = "I need to know which product to add"
+
+        if listslot != None and productslot != None:
+            self.grocy.remove_product_in_shopping_list(productslot.value['value'], listslot.value['value'])
+            #.add_product_to_shopping_list(productslot.value['value'], listslot.value['value'], 1)
+            self._LOGGER.info(f"Intent: {intent.id} | Product removed from Shopping List")                
+            sentence = "I removed the product from the list"
+
+        self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+        self.app.notify(sentence, intent.site_id)
+
+        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYREMOVEPRODUCTFROMSHOPPINGLIST}")
+        self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYREMOVEPRODUCTFROMSHOPPINGLIST}")
         return EndSession(sentence)    
+
+    #Battery Intents
+    async def get_batteries(self, intent: NluIntent):
+        """List the batteries."""
+        self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYGETBATTERIES}")
+
+        sentence = None
+
+        batteries = self.grocy.get_generic_objects_for_type(EntityType.BATTERIES)    
+        self._LOGGER.debug(f"Intent: {intent.id} | Batteries: {batteries}")
+        self._LOGGER.info(f"Intent: {intent.id} | Battery count: {len(batteries)}")
+
+        if len(batteries) > 1:
+            sentence = "There is the "
+            for battery in batteries[:len(batteries)-1]:
+                sentence = sentence + battery['name'] + " battery, "
+            sentence = sentence + "and the " + batteries[-1]['name'] + " battery"
+        else:        
+            sentence = f"There is only the {batteries[0]['name']} battery"
+            
+        self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+        self.app.notify(sentence, intent.site_id)
+        
+        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYGETBATTERIES}")
+        self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYGETBATTERIES}")
+        return EndSession(sentence)    
+
+

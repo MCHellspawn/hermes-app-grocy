@@ -127,12 +127,12 @@ The following intents are implemented on the hermes MQTT topic:
     * Create - Complete - basic only
     * Remove?
     * Add items
-      * By product - In progress
+      * By product - Complete - basic only
       * By "below min stock"
       * By "expired"
       * By recipe
     * Remove items
-      * By product
+      * By product - Complete - basic only
       * Push items to stock
   * Recipies
     * Consume ingredients
@@ -144,15 +144,17 @@ The following intents are implemented on the hermes MQTT topic:
       * All - Complete
       * Per person - Complete
   * Batteries
+    * List - Complete
+    * Get Charge 
     * Change/Track
   * Locations
     * List - Complete
     * Create
 * Slot programs
-  * people/users
+  * people/users - Complete
   * products - Complete
   * locations - Complete
   * chores - Complete
   * quantity_units - Complete
-  * batteries
+  * batteries - Complete
   * recipes

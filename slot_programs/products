@@ -26,5 +26,5 @@ token="$(jq --raw-output .grocy.api_key < "${profile}")"
 
 #Get chores
 echo "GET ${url}/api/objects/products?order=name%3Aasc" >&2
-curl -X GET "${url}/api/objects/products?order=name%3Aasc" -H "GROCY-API-KEY:${token}" | \
+curl -s -X GET "${url}/api/objects/products?order=name%3Aasc" -H "GROCY-API-KEY:${token}" | \
     jq --raw-output '.[] as $e | "(\($e.name)):\($e.id)"'
