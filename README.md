@@ -114,6 +114,8 @@ The following intents are implemented on the hermes MQTT topic:
 
 [GrocyCreateProduct]
 
+[GrocyGetProductInventory]
+
 [GrocyGetChores]
 
 [GrocyTrackChore]
