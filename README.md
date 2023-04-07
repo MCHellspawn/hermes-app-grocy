@@ -112,6 +112,8 @@ The following intents are implemented on the hermes MQTT topic:
 
 [GrocyPurchaseProduct]
 
+[GrocyCreateProduct]
+
 [GrocyGetChores]
 
 [GrocyTrackChore]
@@ -127,6 +129,8 @@ The following intents are implemented on the hermes MQTT topic:
 [GrocyGetBatteries]
 
 [GrocyGetBatteryNextCharge]
+
+[GrocyTrackBatteryCharge]
 ```
 
 ## To-Do
@@ -135,8 +139,10 @@ The following intents are implemented on the hermes MQTT topic:
 * More intents
   * Products
     * "Purchase" - Complete
+    * Create - Complete - very basic only
+      * want to extend this to a conversation
     * Transfer
-    * Inventory
+    * Inventory - Complete
     * Consume
     * Stock Listing
       * All
@@ -166,8 +172,8 @@ The following intents are implemented on the hermes MQTT topic:
       * Per person - Complete
   * Batteries
     * List - Complete
-    * Get Charge 
-    * Change/Track
+    * Get Charge - Complete
+    * Change/Track - Complete
   * Locations
     * List - Complete
     * Create
