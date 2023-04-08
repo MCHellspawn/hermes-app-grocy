@@ -15,6 +15,7 @@ from rhasspyhermes.nlu import NluIntent
 from rhasspyhermes_app import ContinueSession, EndSession, HermesApp
 from pygrocy.data_models.generic import EntityType
 from pygrocy import Grocy
+from pygrocy import errors
 from pygrocy.grocy_api_client import GrocyApiClient,TransactionType,ProductData
 
 class SessionCustomData(BaseModel):
@@ -24,10 +25,13 @@ class SessionCustomData(BaseModel):
 
 class IntentNames(str, Enum):
     GROCYGETLOCATIONS = "GrocyGetLocations"
+    GROCYGETLOCATIONSTOCK = "GrocyGetLocationStock"
 
     GROCYPURCHASEPRODUCT = "GrocyPurchaseProduct"
     GROCYCREATEPRODUCT = "GrocyCreateProduct"
-    GROCYGETPRODUCTINVENTORY = "GrocyGetProductInventory"
+    GROCYGETPRODUCTSTOCK = "GrocyGetProductStock"
+    GROCYTRACKPRODUCTCONSUME = "GrocyTrackProdcutConsume"
+    GROCYTRANSFERPRODUCT = "GrocyTransferProduct"
 
     GROCYGETCHORES = "GrocyGetChores"
     GROCYTRACKCHORE = "GrocyTrackChore"
@@ -138,8 +142,10 @@ class RhasspySkill:
         self.app.on_intent(IntentNames.GROCYGETBATTERIES)(self.get_batteries)
         self.app.on_intent(IntentNames.GROCYGETBATTERYNEXTCHARGETIME)(self.get_batterynextchangetime)
         self.app.on_intent(IntentNames.GROCYTRACKBATTERYCHARGE)(self.track_batterycharge)
-        self.app.on_intent(IntentNames.GROCYGETPRODUCTINVENTORY)(self.get_productinventory)
-        
+        self.app.on_intent(IntentNames.GROCYGETPRODUCTSTOCK)(self.get_productstock)
+        self.app.on_intent(IntentNames.GROCYTRACKPRODUCTCONSUME)(self.track_productconsume)
+        self.app.on_intent(IntentNames.GROCYTRANSFERPRODUCT)(self.transfer_product)
+        self.app.on_intent(IntentNames.GROCYGETLOCATIONSTOCK)(self.get_locationstock)
 
     def read_configuration_file(self):
         try:
@@ -183,11 +189,13 @@ class RhasspySkill:
         responses = configparser.ConfigParser(allow_no_value=True)
         responses.read("config/responses.ini")
         
-        intentErrName = f"{intent.intent.intent_name.replace(f'-{intent.site_id}', '')}-Fail-{errName}"
+        intentErrName = f"{intent.intent.intent_name}-Fail-{errName}"
 
-        intentErrResponses = responses.items(intentErrName)[0]
-        
-        sentence = random.choice(intentErrResponses[0:-1])
+        intentErrResponses = responses.items(intentErrName)
+        if intentErrResponses[-1] == None:
+            intentErrResponses = intentErrResponses[0:-1]
+                    
+        sentence = str(random.choice(intentErrResponses)[0])
 
         self._LOGGER.debug(f"Intent: {intent.id} | response_sentence sentence: {sentence}")
         self._LOGGER.debug(f"Intent: {intent.id} | Completed response_sentence")
@@ -196,7 +204,7 @@ class RhasspySkill:
     def grocy_purchase_product(
         self, 
         grocyapiclient: GrocyApiClient,
-        product_id,
+        product_id: int,
         amount: float,
         price: float,
         best_before_date: None,
@@ -217,6 +225,29 @@ class RhasspySkill:
             data["best_before_date"] = best_before_date.strftime("%Y-%m-%d")
 
         return grocyapiclient._do_post_request(f"stock/products/{product_id}/add", data)
+
+    def grocy_transfer_product(
+        self, 
+        grocyapiclient: GrocyApiClient,
+        product_id: int,
+        fromlocation_id: int,
+        tolocation_id: int,
+        amount: float
+    ):
+        data = {
+            "amount": amount,
+            "location_id_from": fromlocation_id,
+            "location_id_to": tolocation_id
+        }
+
+        return grocyapiclient._do_post_request(f"stock/products/{product_id}/transfer", data)
+
+    def grocy_get_stock_by_location(
+        self, 
+        grocyapiclient: GrocyApiClient,
+        location_id: int = None
+    ):
+        return grocyapiclient._do_get_request(f"stock/locations/{location_id}/entries")
 
     #Utility Intents   
     async def get_locations(self, intent: NluIntent):
@@ -248,6 +279,45 @@ class RhasspySkill:
         self.app.notify(sentence, intent.site_id)
         self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYGETLOCATIONS}")
         self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYGETLOCATIONS}")
+        return EndSession()
+
+    async def get_locationstock(self, intent: NluIntent):
+        """Get location stock."""
+        self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYGETLOCATIONSTOCK}")
+
+        sentence = None
+        
+        locationslot = next((slot for slot in intent.slots if slot.slot_name == 'location'), None)
+        if locationslot == None:
+            self._LOGGER.info(f"Intent: {intent.id} | Location slot equals none")
+            sentence = "I need to know the name of the location"
+        else:
+            products = self.grocy.all_products()
+            self._LOGGER.info(f"Intent: {intent.id} | All Products count: {len(products)}")
+            
+            locationProducts = self.grocy_get_stock_by_location(self.grocy._api_client, locationslot.value['value'])
+            self._LOGGER.debug(f"Intent: {intent.id} | Products: {locationProducts}")
+            self._LOGGER.info(f"Intent: {intent.id} | Product count: {len(locationProducts)}")
+            
+            #Build response sentence
+            if len(locationProducts) == 0:
+                sentence = self.response_sentence(intent, "NoneResponse").format(locationslot.raw_value)
+            if len(locationProducts) == 1:
+                productName = next((product.name for product in products if product.id == locationProducts[0]['product_id']), None)
+                sentence = self.response_sentence(intent) + " " + str(locationProducts[0]['amount']) + " " + productName
+            if len(locationProducts) > 1:
+                sentence = self.response_sentence(intent) + " "
+                for locationProduct in locationProducts[0:-1]:
+                    productName = next((product.name for product in products if product.id == locationProduct['product_id']), None)
+                    sentence = sentence + " " + str(locationProduct['amount']) + " " + productName + ", "
+                productName = next((product.name for product in products if product.id == locationProducts[-1]['product_id']), None)
+                sentence = sentence + "and " + str(locationProducts[-1]["amount"]) + " " + productName
+            
+        self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+        self.app.notify(sentence, intent.site_id)
+        
+        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYGETLOCATIONSTOCK}")
+        self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYGETLOCATIONSTOCK}")
         return EndSession()
 
     #Product Intents
@@ -351,9 +421,9 @@ class RhasspySkill:
         self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYCREATEPRODUCT}")
         return EndSession()
 
-    async def get_productinventory(self, intent: NluIntent):
-        """Get product inventory."""
-        self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYGETPRODUCTINVENTORY}")
+    async def get_productstock(self, intent: NluIntent):
+        """Get product stock."""
+        self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYGETPRODUCTSTOCK}")
 
         sentence = None
         
@@ -371,6 +441,91 @@ class RhasspySkill:
         self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
         self.app.notify(sentence, intent.site_id)
         
+        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYGETPRODUCTSTOCK}")
+        self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYGETPRODUCTSTOCK}")
+        return EndSession()
+
+    async def track_productconsume(self, intent: NluIntent):
+        """Track product consumption."""
+        self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYGETPRODUCTINVENTORY}")
+
+        sentence = None
+        
+        productslot = next((slot for slot in intent.slots if slot.slot_name == 'product'), None)
+        if productslot == None:
+            self._LOGGER.info(f"Intent: {intent.id} | Product slot equals none")
+            sentence = "I need to know the name of the product"
+        else:
+            quantityslot = next((slot for slot in intent.slots if slot.slot_name == 'quantity'), None)
+            if quantityslot != None:
+                quantity = int(quantityslot.value['value'])
+                self._LOGGER.info(f"Intent: {intent.id} | Quantity: {quantity}")
+            else:
+                quantity = 1
+                self._LOGGER.info(f"Intent: {intent.id} | Quantity slot equals none, default to 1")
+
+            try:
+                trackProduct = self.grocy.consume_product(productslot.value['value'], quantity)
+                self._LOGGER.debug(f"Intent: {intent.id} | Product Comsumption: {trackProduct}")
+                self._LOGGER.info(f"Intent: {intent.id} | Product consumed")
+                sentence = self.response_sentence(intent).format(quantity, productslot.raw_value)
+            except errors.GrocyError as error:
+                if error.message == "Amount to be consumed cannot be > current stock amount (if supplied, at the desired location)":
+                    sentence = self.fail_sentence(intent, "GrocyError-NotEnough").format(productslot.raw_value)
+                else:
+                    sentence = self.fail_sentence(intent, "GrocyError").format(error.message)                
+
+        self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+        self.app.notify(sentence, intent.site_id)
+
+        self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYGETPRODUCTINVENTORY}")
+        self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYGETPRODUCTINVENTORY}")
+        return EndSession()
+
+    async def transfer_product(self, intent: NluIntent):
+        """Transfer product between locations."""
+        self._LOGGER.info(f"Intent: {intent.id} | Started: {IntentNames.GROCYGETPRODUCTINVENTORY}")
+
+        sentence = None
+        
+        productslot = next((slot for slot in intent.slots if slot.slot_name == 'product'), None)
+        if productslot == None:
+            self._LOGGER.info(f"Intent: {intent.id} | Product slot equals none")
+            sentence = "I need to know the name of the product"
+
+        fromlocslot = next((slot for slot in intent.slots if slot.slot_name == 'fromloc'), None)
+        if fromlocslot == None:
+            self._LOGGER.info(f"Intent: {intent.id} | From location slot equals none")
+            sentence = "I need to know the name of the source location"
+
+        tolocslot = next((slot for slot in intent.slots if slot.slot_name == 'toloc'), None)
+        if tolocslot == None:
+            self._LOGGER.info(f"Intent: {intent.id} | To location slot equals none")
+            sentence = "I need to know the name of the destination location"
+        
+        if productslot != None and fromlocslot != None and tolocslot != None:
+            quantityslot = next((slot for slot in intent.slots if slot.slot_name == 'quantity'), None)
+            if quantityslot != None:
+                quantity = int(quantityslot.value['value'])
+                self._LOGGER.info(f"Intent: {intent.id} | Quantity: {quantity}")
+            else:
+                quantity = 1
+                self._LOGGER.info(f"Intent: {intent.id} | Quantity slot equals none, default to 1")
+
+            try:
+                transferProduct = self.grocy_transfer_product(self.grocy._api_client, product_id=productslot.value['value'], fromlocation_id=fromlocslot.value['value'], tolocation_id=tolocslot.value['value'], amount=quantity)
+                self._LOGGER.debug(f"Intent: {intent.id} | Product Transfer: {transferProduct}")
+                self._LOGGER.info(f"Intent: {intent.id} | Product transfered")
+                sentence = self.response_sentence(intent).format(productslot.raw_value, fromlocslot.raw_value, tolocslot.raw_value)
+            except errors.GrocyError as error:
+                if error.message == "Amount to be transferred cannot be > current stock amount at the source location":
+                    sentence = self.fail_sentence(intent, "GrocyError-NotEnough").format(productslot.raw_value)
+                else:
+                    sentence = self.fail_sentence(intent, "GrocyError").format(error.message)                
+
+        self._LOGGER.info(f"Intent: {intent.id} | Sentence: {sentence}")
+        self.app.notify(sentence, intent.site_id)
+
         self._LOGGER.info(f"Intent: {intent.id} | Responded to {IntentNames.GROCYGETPRODUCTINVENTORY}")
         self._LOGGER.info(f"Intent: {intent.id} | Completed: {IntentNames.GROCYGETPRODUCTINVENTORY}")
         return EndSession()

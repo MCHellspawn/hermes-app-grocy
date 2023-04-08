@@ -143,14 +143,15 @@ The following intents are implemented on the hermes MQTT topic:
     * "Purchase" - Complete
     * Create - Complete - very basic only
       * want to extend this to a conversation
-    * Transfer
-    * Inventory - Complete
-    * Consume
+    * Transfer - Complete
+    * Inventory
+    * Consume - Complete - basic
     * Stock Listing
       * All
-      * By location
+      * By location - Complete
       * By product type
-      * By product
+      * By product - Complete
+        * Include child items
   * Shopping lists
     * List - Complete
     * Create - Complete - basic only
